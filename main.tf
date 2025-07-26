@@ -1,26 +1,33 @@
-provider "aws" {
-  region = var.aws_region
+this is my main.tf  provider "aws" {
+  region = "us-east-2"
+}
+
+resource "random_id" "suffix" {
+  byte_length = 4
 }
 
 resource "aws_security_group" "strapi_sg" {
-  name        = "strapi-sg"
-  description = "Allow SSH and Strapi port"
-  
+  name        = "strapi-sg-${random_id.suffix.hex}"
+  description = "Allow HTTP and SSH"
+
   ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    from_port   = 1337
-    to_port     = 1337
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   egress {
+    description = "Allow all"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -28,27 +35,23 @@ resource "aws_security_group" "strapi_sg" {
   }
 }
 
-resource "aws_instance" "strapi" {
-  ami                         = var.ami_id
-  instance_type               = var.instance_type
-  key_name                    = var.key_name
+resource "aws_instance" "strapi_ec2" {
+  ami                         = "ami-0c55b159cbfafe1f0" # Ubuntu 22.04 LTS in us-east-2
+  instance_type               = "t2.micro"
+  key_name                    = "hello" # Your existing key pair 
   vpc_security_group_ids      = [aws_security_group.strapi_sg.id]
+  user_data                   = file("${path.module}/user-data.sh")
 
   tags = {
-    Name = "strapi-server"
+    Name = "strapi-instance-${random_id.suffix.hex}"
   }
-
-  user_data = <<-EOF
-              #!/bin/bash
-              yum update -y
-              amazon-linux-extras install docker -y
-              service docker start
-              usermod -a -G docker ec2-user
-              docker pull lithu213/strapi-app:latest
-              docker run -d -p 1337:1337 --name strapi-app lithu213/strapi-app:latest
-              EOF
 }
 
-output "public_ip" {
-  value = aws_instance.strapi.public_ip
-}
+
+
+
+
+
+
+
+
