@@ -1,50 +1,41 @@
-name: CD - Terraform Deployment
+name: Deploy Strapi with Terraform
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manually triggered
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Terraform
+      - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.6
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Save EC2 Private Key
-        run: |
-          echo "${{ secrets.EC2_PRIVATE_KEY }}" > hello.pem
-          chmod 400 hello.pem
+          terraform_version: 1.5.7
 
       - name: Terraform Init
+        working-directory: .
         run: terraform init
-        working-directory: ./terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Terraform Plan
+        working-directory: .
         run: terraform plan
-        working-directory: ./terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Terraform Apply
+        working-directory: .
         run: terraform apply -auto-approve
-        working-directory: ./terraform
-
-      - name: Get EC2 Public IP Output
-        id: get_ip
-        run: |
-          echo "PUBLIC_IP=$(terraform -chdir=./terraform output -raw public_ip)" >> $GITHUB_ENV
-
-      - name: Output Access URL
-        run: |
-          echo "Strapi should be available at: http://${{ env.PUBLIC_IP }}:1337"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
