@@ -1,33 +1,67 @@
-name: Deploy with Terraform
+name: CD - Terraform Deployment
 
 on:
   workflow_dispatch:
 
 jobs:
-  terraform:
-    name: Terraform Deployment
+  deploy:
     runs-on: ubuntu-latest
 
+    env:
+      TF_LOG: INFO
+
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
 
-      - name: Terraform Init
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Initialize Terraform
         run: terraform init
-        working-directory: .
 
       - name: Terraform Plan
         run: terraform plan
-        working-directory: .
 
-      - name: Terraform Apply
+      - name: Terraform Apply (Auto Approve)
         run: terraform apply -auto-approve
-        working-directory: .
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Get EC2 Public IP Output
+        id: get_ip
+        run: |
+          echo "PUBLIC_IP=$(terraform output -raw public_ip)" >> $GITHUB_ENV
+
+      - name: Wait for EC2 SSH to be Ready
+        run: |
+          echo "Waiting for SSH to be ready..."
+          for i in {1..20}; do
+            if ssh -o StrictHostKeyChecking=no -i ./hello.pem ec2-user@${{ env.PUBLIC_IP }} 'echo SSH Ready'; then
+              break
+            else
+              echo "Retrying in 15s..."
+              sleep 15
+            fi
+          done
+
+      - name: Deploy Docker Container on EC2
+        run: |
+          chmod 400 ./hello.pem
+          ssh -o StrictHostKeyChecking=no -i ./hello.pem ec2-user@${{ env.PUBLIC_IP }} << EOF
+            sudo yum update -y
+            sudo yum install -y docker
+            sudo service docker start
+            sudo usermod -aG docker ec2-user
+            newgrp docker
+            docker pull lithu213/strapi-app:latest
+            docker stop strapi-app || true && docker rm strapi-app || true
+            docker run -d -p 1337:1337 --name strapi-app lithu213/strapi-app:latest
+          EOF
