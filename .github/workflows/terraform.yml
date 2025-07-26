@@ -1,28 +1,40 @@
-name: Deploy Strapi to EC2 with Terraform
+name: Deploy with Terraform
 
 on:
   workflow_dispatch:
-
-env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  AWS_REGION: ${{ secrets.AWS_REGION }}
+    inputs:
+      image_tag:
+        description: "Docker image tag"
+        required: true
+        default: "latest"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Terraform
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.8.0
 
       - name: Terraform Init
+        working-directory: terraform
         run: terraform init
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        working-directory: terraform
+        run: terraform apply -auto-approve -var="image_tag=${{ github.event.inputs.image_tag }}"
+
+      - name: SSH into EC2 and Restart Container
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_PUBLIC_IP }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            docker pull lithu213/strapi-app:${{ github.event.inputs.image_tag }}
+            docker stop strapi-app || true
+            docker rm strapi-app || true
+            docker run -d -p 80:1337 --name strapi-app lithu213/strapi-app:${{ github.event.inputs.image_tag }}
