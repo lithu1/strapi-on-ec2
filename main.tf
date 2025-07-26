@@ -1,4 +1,4 @@
-this is my main.tf  provider "aws" {
+  provider "aws" {
   region = "us-east-2"
 }
 
