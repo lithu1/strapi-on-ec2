@@ -1,4 +1,4 @@
-name: Terraform Apply
+name: Deploy Strapi to EC2 with Terraform
 
 on:
   workflow_dispatch:
@@ -13,20 +13,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Terraform
+      - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.6
+          terraform_version: 1.8.0
 
       - name: Terraform Init
-        run: |
-          cd terraform
-          terraform init
+        run: terraform init
 
       - name: Terraform Apply
-        run: |
-          cd terraform
-          terraform apply -auto-approve
+        run: terraform apply -auto-approve
